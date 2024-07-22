@@ -5,6 +5,7 @@ import torch
 from torch_geometric.loader import DataLoader
 from model import ProteinLigandGNN, train, evaluate, generate_sequence
 from data import load_protein_ligand_graph
+import argparse 
 
 
 # Set seed for reproducibility 
@@ -20,12 +21,17 @@ MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
 NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
 MAX_LENGTH = 512 
+HIDDEN_DIM = 128 
+NUM_LAYERS = 3
+BATCH_SIZE = 32 
 
 ###############################################################################
 # Main training loop                                                          #
 ###############################################################################
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
 
     
     # 1. switch to CUDA 
@@ -38,20 +44,19 @@ if __name__ == "__main__":
         protein_features=NUM_DIHEDRAL_FEATURES,
         ligand_features=NUM_ATOM_FEATURES,
         edge_features=NUM_RBF,
-        hidden_dim=128,
-        num_layers=6,
+        hidden_dim=HIDDEN_DIM,
+        num_layers=3,
     ).to(device)
 
     # 3. compile model 
-    model = torch.compile(model)
+    #model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
     current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_dir = f"runs/experiment_{current_time}"
     writer = SummaryWriter(log_dir=log_dir)
 
     train_set = torch.load("train_set.pt") 
-    train_loader = DataLoader(train_set, batch_size=256, shuffle=False)
-
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)
 
     # Run training 
     num_epochs = 50

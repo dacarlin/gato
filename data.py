@@ -16,6 +16,7 @@ seed(42)
 
 
 # Constants
+MAX_SAMPLES = 100
 NUM_AMINO_ACIDS = 20
 MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
@@ -23,6 +24,7 @@ MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
 NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
 MAX_LENGTH = 512 
+BASE_DIR = "data/dompdb"
 
 
 # Global map from residues to tokens 
@@ -311,14 +313,10 @@ def load_protein_ligand_graph(pdb_file):
     )
 
 
-###############################################################################
-# Main training loop                                                          #
-###############################################################################
-
 if __name__ == "__main__":
 
-    MAX_SAMPLES = 45_000
-    pdb_files = glob("data/dompdb/*")[:MAX_SAMPLES]
+    # Load PDB files from disk 
+    pdb_files = glob(f"{BASE_DIR}/*")[:MAX_SAMPLES]
     shuffle(pdb_files)
     n1 = int(0.8 * len(pdb_files))
     n2 = int(0.9 * len(pdb_files))
