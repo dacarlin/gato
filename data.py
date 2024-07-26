@@ -346,11 +346,12 @@ if __name__ == "__main__":
            train_set.append(load_protein_ligand_graph(pdb_file))
        except KeyError:
            pass 
-    #train_set = torch.load("train_set.pt") 
-    #train_loader = DataLoader(train_set, batch_size=256, shuffle=False)    
+    # Later, load with:
+    # train_set = torch.load("train_set.pt")
+    # train_loader = DataLoader(train_set, batch_size=256, shuffle=False)    
     torch.save(train_set, "train_set.pt") 
 
-    # Evaluate on validaton set 
+    # Process validation examples 
     val_set = []
     for pdb_file in track(val_files, description=f"Loading validation samples (n={len(val_files)})"):
         try:
@@ -360,7 +361,7 @@ if __name__ == "__main__":
     torch.save(val_set, "val_set.pt") 
 
 
-    # Evaluate on validaton set 
+    # Process test samples 
     test_set = []
     for pdb_file in track(test_files, description=f"Loading validation samples (n={len(test_files)})"):
         try:
