@@ -7,7 +7,6 @@ from Bio.PDB import PDBParser
 from Bio.Data import IUPACData
 import numpy as np 
 from rich.progress import track 
-from torch.utils.tensorboard import SummaryWriter
 
 
 # Set seed for reproducibility 
@@ -57,6 +56,11 @@ aa_to_idx = {
 # Reverse map of tokens to amino acids 
 idx_to_aa = {v: k for k, v in aa_to_idx.items()}
 idx_to_aa.update({11: "LYS"})
+
+idx_to_aa1 = {k: IUPACData.protein_letters_3to1[v.capitalize()] for k, v in idx_to_aa.items()}
+aa1_to_idx = {v: k for k, v in idx_to_aa1.items()}
+
+#torch.save("tokenizers")
 
 
 ###############################################################################
@@ -310,6 +314,7 @@ def load_protein_ligand_graph(pdb_file):
         ligand_x=ligand_features,
         ligand_pos=ligand_coords,
         ligand_batch=ligand_batch,
+        name=pdb_file, 
     )
 
 
