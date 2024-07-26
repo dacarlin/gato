@@ -265,6 +265,11 @@ def load_protein_ligand_graph(pdb_file):
     ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
     coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
 
+    # to get n, c, ca, o distances, we need 
+    #n_atoms = [residue["N"] for residue in residues if "N" in residue]
+    #n_atoms_coords = torch.tensor(np.array([atom.coord for atom in n_atoms]), dtype=torch.float)
+    #etc, etc
+
     # Create k-nearest neighbors graph
     transform = RadiusGraph(r=MAX_DISTANCE, max_num_neighbors=MAX_NUM_NEIGHBORS, loop=True)
     data = Data(pos=coords)
@@ -275,6 +280,15 @@ def load_protein_ligand_graph(pdb_file):
         coords[data.edge_index[0]] - coords[data.edge_index[1]], dim=1
     )
     edge_attr = rbf_encode(distances)
+
+    # for n, c, ca, o distacnes, do the distnaces line again 
+    # n_distances = torch.norm(
+    #     n_coords[data.edge_index[0]] - n_coords[data.edge_index[1]], dim=1
+    # )
+
+    # then concatenate them all 
+    # all_distances = torch.cat((n_atoms, ca_atoms, c_atoms, o_atoms))
+    # edge_attr = rbf_encode(all_distances)
 
     # Node features (backbone dihedrals)
     x = get_backbone_dihedrals(list(residue for residue in residues if "CA" in residue))
