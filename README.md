@@ -65,3 +65,13 @@ For the benchmarks, we train models using the code from Ingraham and ProteinMPNN
 - `prepare_cath_dataset.ipynb`. Create the CATH dataset from raw files. Creates the files `chains.jsonl` and `splits.jsonl`. 
 - `compare_features.ipynb`. Compare features from Ingraham and ProteinMPNN.  
 
+| Model | Modification | Params | Test perplexity | Test accuracy |
+|-------|--------------|--------|-----------------|---------------|
+| Uniform |           |         | 20.0            |           | 
+| Natural frequencies |         | | 17.83 |  | 
+| Ingraham (h=128,layer=3) | CA only |     | 6.85 |  | 
+| ProteinMPNN | CA only | 1.3 M | 6.51 | 41.2 |
+| ProteinMPNN | Add N, Ca, C, Cb, O distances | 1.43 M | 5.03 | 49.0 |
+
+ProteinMPNN paper: https://doi.org/10.1101/2022.06.03.494563
+Ingraham https://github.com/jingraham/neurips19-graph-protein-design
