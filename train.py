@@ -43,7 +43,7 @@ if __name__ == "__main__":
     model = ProteinLigandGNN(
         protein_features=NUM_DIHEDRAL_FEATURES,
         ligand_features=NUM_ATOM_FEATURES,
-        edge_features=NUM_RBF,
+        edge_features=NUM_RBF * 16,
         hidden_dim=HIDDEN_DIM,
         num_layers=NUM_LAYERS,
     ).to(device)
