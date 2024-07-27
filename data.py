@@ -15,7 +15,7 @@ seed(42)
 
 
 # Constants
-MAX_SAMPLES = 100
+MAX_SAMPLES = 500
 NUM_AMINO_ACIDS = 20
 MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
@@ -258,18 +258,18 @@ def load_protein_ligand_graph(pdb_file):
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("protein", pdb_file)
-
     residues = list(structure.get_residues())
+
     # remove HHOH, NA, CL, K, and other tings 
     if len(residues) > MAX_LENGTH:
         raise KeyError("too long")
+
+    # get backbone atoms. We need CA for distance matrix, and others for distance features 
     ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
     ca_atoms_coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
 
-    # to get n, c, ca, o distances, we need 
     n_atoms = [residue["N"] for residue in residues if "N" in residue]
     n_atoms_coords = torch.tensor(np.array([atom.coord for atom in n_atoms]), dtype=torch.float)
-    #etc, etc
 
     c_atoms = [residue["C"] for residue in residues if "C" in residue]
     c_atoms_coords = torch.tensor(np.array([atom.coord for atom in c_atoms]), dtype=torch.float)
@@ -277,74 +277,37 @@ def load_protein_ligand_graph(pdb_file):
     o_atoms = [residue["O"] for residue in residues if "O" in residue]
     o_atoms_coords = torch.tensor(np.array([atom.coord for atom in o_atoms]), dtype=torch.float)
 
-
     # Create k-nearest neighbors graph
     transform = RadiusGraph(r=MAX_DISTANCE, max_num_neighbors=MAX_NUM_NEIGHBORS, loop=True)
     data = Data(pos=ca_atoms_coords)
     data = transform(data)
 
     # Compute edge features (RBF-encoded distances)
-    ca_distances = torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)
-    # print(f"{distances.shape=}")
-    # print(distances)
-    #edge_attr = rbf_encode(distances)
-    ca_distances_encoded = rbf_encode(ca_distances)
-    # print(f"{distances_encoded.shape=}")
+    # ca_distances = torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)
+    # ca_distances_encoded = rbf_encode(ca_distances)
 
-    # for n, c, ca, o distacnes, do the distnaces line again 
-    n_distances = torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)
-    n_distances_encoded = rbf_encode(n_distances)
+    # n_distances = torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)
+    # n_distances_encoded = rbf_encode(n_distances)
 
-    c_distances = torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)
-    c_distances_encoded = rbf_encode(c_distances)
+    # c_distances = torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)
+    # c_distances_encoded = rbf_encode(c_distances)
 
-    o_distances = torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)
-    o_distances_encoded = rbf_encode(o_distances)
-
-
-    # Like ProteinMPNN 
-    # RBF_all.append(self._rbf(D_neighbors)) #Ca-Ca, done 
-    # RBF_all.append(self._get_rbf(N, N, E_idx)) #N-N, done, 
-    # RBF_all.append(self._get_rbf(C, C, E_idx)) #C-C, done, 
-    # RBF_all.append(self._get_rbf(O, O, E_idx)) #O-O, done 
-    # RBF_all.append(self._get_rbf(Cb, Cb, E_idx)) #Cb-Cb, not included 
-
-    # RBF_all.append(self._get_rbf(Ca, N, E_idx)) #Ca-N
-    dist_1_enc = rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1))
-
-    # RBF_all.append(self._get_rbf(Ca, C, E_idx)) #Ca-C
-    dist_2_enc = rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1))
-
-    # RBF_all.append(self._get_rbf(Ca, O, E_idx)) #Ca-O
-    dist_3_enc = rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1))
-
-    # RBF_all.append(self._get_rbf(Ca, Cb, E_idx)) #Ca-Cb, not included 
-    # RBF_all.append(self._get_rbf(N, C, E_idx)) #N-C
-    dist_4_enc = rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1))
-
-    # RBF_all.append(self._get_rbf(N, O, E_idx)) #N-O
-    # RBF_all.append(self._get_rbf(N, Cb, E_idx)) #N-Cb
-    # RBF_all.append(self._get_rbf(Cb, C, E_idx)) #Cb-C
-    # RBF_all.append(self._get_rbf(Cb, O, E_idx)) #Cb-O
-    # RBF_all.append(self._get_rbf(O, C, E_idx)) #O-C
-    # RBF_all.append(self._get_rbf(N, Ca, E_idx)) #N-Ca
-    # RBF_all.append(self._get_rbf(C, Ca, E_idx)) #C-Ca
-    # RBF_all.append(self._get_rbf(O, Ca, E_idx)) #O-Ca
-    # RBF_all.append(self._get_rbf(Cb, Ca, E_idx)) #Cb-Ca
-    # RBF_all.append(self._get_rbf(C, N, E_idx)) #C-N
-    # RBF_all.append(self._get_rbf(O, N, E_idx)) #O-N
-    # RBF_all.append(self._get_rbf(Cb, N, E_idx)) #Cb-N
-    # RBF_all.append(self._get_rbf(C, Cb, E_idx)) #C-Cb
-    # RBF_all.append(self._get_rbf(O, Cb, E_idx)) #O-Cb
-    # RBF_all.append(self._get_rbf(C, O, E_idx)) #C-O
-    # RBF_all = torch.cat(tuple(RBF_all), dim=-1)
+    # o_distances = torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)
+    # o_distances_encoded = rbf_encode(o_distances)
 
     all_dist = [
+        # ca only 
+        # 16 features == NUM_RBF 
+        #rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+
+        # backbone only 
+        #4 lists of distacnes encoded to 4*16=64
         #rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
         #rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
         #rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
         #rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
 
+        # all backbone atoms by all backbone atoms (4*4=16 lists of distances encoded to 16*16=256 features)
         rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
         rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
         rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
@@ -366,21 +329,12 @@ def load_protein_ligand_graph(pdb_file):
         rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
     ]
 
-
-
-    # then concatenate them all 
-    all_distances = (n_distances_encoded, ca_distances_encoded, c_distances_encoded, o_distances_encoded, 
-                     dist_1_enc, dist_2_enc, dist_3_enc, dist_4_enc)
-    # for thing in all_distances:
-    #     print(f"{thing.shape=}")
-    
     # for all distances 
     edge_attr = torch.cat(all_dist, dim=1)
 
     # for CA only 
     #edge_attr = ca_distances_encoded
-    print(f'{edge_attr.shape=}')
-
+    #print(f'{edge_attr.shape=}')
 
     # Node features (backbone dihedrals)
     x = get_backbone_dihedrals(list(residue for residue in residues if "CA" in residue))
