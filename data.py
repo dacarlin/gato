@@ -15,7 +15,7 @@ seed(42)
 
 
 # Constants
-MAX_SAMPLES = 500
+MAX_SAMPLES = 45_000
 NUM_AMINO_ACIDS = 20
 MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
@@ -400,14 +400,15 @@ if __name__ == "__main__":
     print(f'number of examples in train={len(train_files)} val={len(val_files)} test={len(test_files)}')
 
     #Load training examples 
-    def load_pdbs(pdb_files):
+    def load_pdbs(pdb_files, verbose=False):
         errors = 0 
         dataset = []
         for pdb_file in track(pdb_files, description=f"Loading samples (n={len(pdb_files)})"):
             try:
                 dataset.append(load_protein_ligand_graph(pdb_file))
             except Exception as e:
-                print(e)
+                if verbose:
+                    print(e)
                 errors += 1
 
         print(f"Processed {len(pdb_files)} files with {errors} errors")

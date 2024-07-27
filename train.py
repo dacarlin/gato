@@ -23,7 +23,10 @@ NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
 MAX_LENGTH = 512 
 HIDDEN_DIM = 128 
 NUM_LAYERS = 6
-BATCH_SIZE = 32 
+BATCH_SIZE = 128 
+LEARNING_RATE = 3e-4
+EXPR_NAME = "h128_b128_feat3_l6_e150"
+
 
 ###############################################################################
 # Main training loop                                                          #
@@ -33,7 +36,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    
     # 1. switch to CUDA 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -53,16 +55,19 @@ if __name__ == "__main__":
 
     # 3. compile model 
     #model = torch.compile(model)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"runs/experiment_{current_time}"
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.95), eps=1e-8)
+    if EXPR_NAME:
+        log_dir = f"runs/experiment_{EXPR_NAME}"
+    else:
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = f"runs/experiment_{current_time}"
     writer = SummaryWriter(log_dir=log_dir)
 
     train_set = torch.load("train_set.pt") 
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)
 
     # Run training 
-    num_epochs = 50
+    num_epochs = 150
     for epoch in range(num_epochs):
         loss = train(model, train_loader, optimizer, device)
         writer.add_scalar("epoch/loss/train", loss, epoch)
