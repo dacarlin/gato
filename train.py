@@ -22,7 +22,7 @@ NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
 NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
 MAX_LENGTH = 512 
 HIDDEN_DIM = 128 
-NUM_LAYERS = 3
+NUM_LAYERS = 6
 BATCH_SIZE = 32 
 
 ###############################################################################
@@ -45,8 +45,11 @@ if __name__ == "__main__":
         ligand_features=NUM_ATOM_FEATURES,
         edge_features=NUM_RBF,
         hidden_dim=HIDDEN_DIM,
-        num_layers=3,
+        num_layers=NUM_LAYERS,
     ).to(device)
+
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
+    print(f"Model with {n_params:,} params")
 
     # 3. compile model 
     #model = torch.compile(model)
