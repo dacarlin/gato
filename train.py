@@ -15,7 +15,7 @@ seed(42)
 
 # Constants
 NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 16
+MAX_NUM_NEIGHBORS = 32
 NUM_RBF = 16
 MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
@@ -25,7 +25,7 @@ HIDDEN_DIM = 128
 NUM_LAYERS = 6
 BATCH_SIZE = 128 
 LEARNING_RATE = 3e-4
-EXPR_NAME = "h128_b128_feat3_l6_e150"
+EXPR_NAME = "h128_b128_feat3_k32_l6_e150_compiled"
 
 
 ###############################################################################
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     print(f"Model with {n_params:,} params")
 
     # 3. compile model 
-    #model = torch.compile(model)
+    model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.95), eps=1e-8)
     if EXPR_NAME:
         log_dir = f"runs/experiment_{EXPR_NAME}"

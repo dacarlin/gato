@@ -17,9 +17,8 @@ seed(42)
 # Constants
 MAX_SAMPLES = 45_000
 NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 16
+MAX_NUM_NEIGHBORS = 32
 NUM_RBF = 16
-#NUM_EDGE_FEATURES = NUM_RBF * number of backbone atoms, CA=1, for N-CA-C-O=4
 MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
 NUM_ATOM_FEATURES = 10     # one hot atom type 
@@ -265,15 +264,12 @@ def load_protein_ligand_graph(pdb_file):
         raise KeyError("too long")
 
     # get backbone atoms. We need CA for distance matrix, and others for distance features 
-    ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
-    ca_atoms_coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
-
     n_atoms = [residue["N"] for residue in residues if "N" in residue]
     n_atoms_coords = torch.tensor(np.array([atom.coord for atom in n_atoms]), dtype=torch.float)
-
+    ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
+    ca_atoms_coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
     c_atoms = [residue["C"] for residue in residues if "C" in residue]
     c_atoms_coords = torch.tensor(np.array([atom.coord for atom in c_atoms]), dtype=torch.float)
-
     o_atoms = [residue["O"] for residue in residues if "O" in residue]
     o_atoms_coords = torch.tensor(np.array([atom.coord for atom in o_atoms]), dtype=torch.float)
 
@@ -283,18 +279,6 @@ def load_protein_ligand_graph(pdb_file):
     data = transform(data)
 
     # Compute edge features (RBF-encoded distances)
-    # ca_distances = torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)
-    # ca_distances_encoded = rbf_encode(ca_distances)
-
-    # n_distances = torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)
-    # n_distances_encoded = rbf_encode(n_distances)
-
-    # c_distances = torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)
-    # c_distances_encoded = rbf_encode(c_distances)
-
-    # o_distances = torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)
-    # o_distances_encoded = rbf_encode(o_distances)
-
     all_dist = [
         # ca only 
         # 16 features == NUM_RBF 
@@ -329,11 +313,7 @@ def load_protein_ligand_graph(pdb_file):
         rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
     ]
 
-    # for all distances 
     edge_attr = torch.cat(all_dist, dim=1)
-
-    # for CA only 
-    #edge_attr = ca_distances_encoded
     #print(f'{edge_attr.shape=}')
 
     # Node features (backbone dihedrals)
@@ -396,7 +376,6 @@ if __name__ == "__main__":
     }
 
     torch.save(splits, "splits.pt")
-
     print(f'number of examples in train={len(train_files)} val={len(val_files)} test={len(test_files)}')
 
     #Load training examples 
@@ -412,7 +391,6 @@ if __name__ == "__main__":
                 errors += 1
 
         print(f"Processed {len(pdb_files)} files with {errors} errors")
-           
         return dataset 
 
     train_set = load_pdbs(train_files)

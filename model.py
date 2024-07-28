@@ -198,15 +198,15 @@ def train(model, train_loader, optimizer, device):
         out = model(data.x, data.edge_index, data.edge_attr, data.batch, data.ligand_x, data.ligand_batch)
         loss = F.cross_entropy(out, data.y)
         loss.backward()
-        #norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
         total_loss += loss.item()
 
         t1 = time.time()
         dt = (t1 - t0)*1000 # time difference in miliseconds
         tokens_per_sec = (data.x.size(0) * data.x.size(1)) / (t1 - t0)
-        print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
-        #print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} norm={norm:2.2f} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
+        #print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
+        print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} norm={norm:2.2f} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
 
     return total_loss / len(train_loader)
 
