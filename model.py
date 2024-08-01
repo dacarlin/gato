@@ -1,21 +1,10 @@
-import torch_geometric
-from glob import glob 
-from datetime import datetime
-import os.path as osp
-from random import shuffle, seed
+from random import seed
 import time 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv, GATv2Conv, global_add_pool
-from torch_geometric.data import Data, Dataset 
-from torch_geometric.loader import DataLoader
-from torch_geometric.transforms import RadiusGraph
-from Bio.PDB import PDBParser
+from torch_geometric.nn import TransformerConv, GATv2Conv, global_add_pool
 from Bio.Data import IUPACData
-import numpy as np 
-from rich.progress import track 
-from torch.utils.tensorboard import SummaryWriter
 
 
 # Set seed for reproducibility 
@@ -25,12 +14,7 @@ seed(42)
 
 # Constants
 NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 16
-NUM_RBF = 16
-MAX_DISTANCE = 32.0
-NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
-NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
-MAX_LENGTH = 512 
+HEADS = 4 
 
 
 # Global map from residues to tokens 
@@ -99,7 +83,7 @@ class ProteinLigandGNN(nn.Module):
         # Multiple GAT layers for message passing
         self.gat_layers = nn.ModuleList(
             [
-                GATv2Conv(hidden_dim, hidden_dim, heads=4, concat=False, edge_dim=hidden_dim)
+                GATv2Conv(hidden_dim, hidden_dim, heads=HEADS, concat=False, edge_dim=hidden_dim)
                 for _ in range(num_layers)
             ]
         )
@@ -201,12 +185,9 @@ def train(model, train_loader, optimizer, device):
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
         total_loss += loss.item()
-
         t1 = time.time()
         dt = (t1 - t0)*1000 # time difference in miliseconds
-        tokens_per_sec = (data.x.size(0) * data.x.size(1)) / (t1 - t0)
-        #print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
-        print(f"x={data.x.shape} edge_attr={data.x.edge_attr.shape} norm={norm:2.2f} loss={loss.item()} dt={dt:.2f}ms tok/sec={tokens_per_sec:.2f}")
+        print(f"x={data.x.shape} edge_attr={data.edge_attr.shape} norm={norm:2.2f} loss={loss.item():.4f} dt={dt:.2f}ms")
 
     return total_loss / len(train_loader)
 
@@ -297,18 +278,15 @@ def generate_sequence(model, data, device, temperature=1.0, top_k=None):
 
 if __name__ == "__main__":
 
-    
-    # 1. switch to CUDA 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = ProteinLigandGNN(
-        protein_features=NUM_DIHEDRAL_FEATURES,
-        ligand_features=NUM_ATOM_FEATURES,
-        edge_features=NUM_RBF,
-        hidden_dim=128,
-        num_layers=6,
+        protein_features=4,
+        ligand_features=10,
+        edge_features=16,
+        hidden_dim=64,
+        num_layers=3,
     ).to(device)
 
     # 3. compile model 
     model = torch.compile(model)
-    

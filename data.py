@@ -7,6 +7,23 @@ from Bio.PDB import PDBParser
 from Bio.Data import IUPACData
 import numpy as np 
 from rich.progress import track 
+from dataclasses import dataclass
+
+
+@dataclass
+class Config:
+    max_samples = 100
+    num_classes = 20
+    max_num_neighbors = 16 
+    num_rbf = 16 
+    max_distance = 32.0 
+    num_dihedral_features = 4 
+    num_atom_features = 10 
+    max_length = 512 
+    base_dir = "data/dompdb"
+
+config = Config
+print(config)
 
 
 # Set seed for reproducibility 
@@ -15,9 +32,8 @@ seed(42)
 
 
 # Constants
-MAX_SAMPLES = 45_000
-NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 32
+MAX_SAMPLES = 100
+MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
 MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
