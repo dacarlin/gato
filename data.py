@@ -7,6 +7,23 @@ from Bio.PDB import PDBParser
 from Bio.Data import IUPACData
 import numpy as np 
 from rich.progress import track 
+from dataclasses import dataclass
+
+
+@dataclass
+class Config:
+    max_samples = 100
+    num_classes = 20
+    max_num_neighbors = 16 
+    num_rbf = 16 
+    max_distance = 32.0 
+    num_dihedral_features = 4 
+    num_atom_features = 10 
+    max_length = 512 
+    base_dir = "data/dompdb"
+
+config = Config
+print(config)
 
 
 # Set seed for reproducibility 
@@ -16,12 +33,11 @@ seed(42)
 
 # Constants
 MAX_SAMPLES = 100
-NUM_AMINO_ACIDS = 20
 MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
 MAX_DISTANCE = 32.0
 NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
-NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
+NUM_ATOM_FEATURES = 10     # one hot atom type 
 MAX_LENGTH = 512 
 BASE_DIR = "data/dompdb"
 
@@ -80,7 +96,7 @@ def rbf_encode(distances, num_rbf=NUM_RBF, max_distance=MAX_DISTANCE):
     Returns:
         Tensor: RBF-encoded distances.
     """
-    rbf_centers = torch.linspace(0, max_distance, num_rbf)
+    rbf_centers = torch.linspace(2., max_distance, num_rbf)
     rbf_widths = (max_distance / num_rbf) * torch.ones_like(rbf_centers)
     rbf_activation = torch.exp(
         -((distances.unsqueeze(-1) - rbf_centers) ** 2) / (2 * rbf_widths**2)
@@ -257,45 +273,71 @@ def load_protein_ligand_graph(pdb_file):
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("protein", pdb_file)
-
     residues = list(structure.get_residues())
+
     # remove HHOH, NA, CL, K, and other tings 
     if len(residues) > MAX_LENGTH:
         raise KeyError("too long")
-    ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
-    coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
 
-    # to get n, c, ca, o distances, we need 
-    #n_atoms = [residue["N"] for residue in residues if "N" in residue]
-    #n_atoms_coords = torch.tensor(np.array([atom.coord for atom in n_atoms]), dtype=torch.float)
-    #etc, etc
+    # get backbone atoms. We need CA for distance matrix, and others for distance features 
+    n_atoms = [residue["N"] for residue in residues if "N" in residue]
+    n_atoms_coords = torch.tensor(np.array([atom.coord for atom in n_atoms]), dtype=torch.float)
+    ca_atoms = [residue["CA"] for residue in residues if "CA" in residue]
+    ca_atoms_coords = torch.tensor(np.array([atom.coord for atom in ca_atoms]), dtype=torch.float)
+    c_atoms = [residue["C"] for residue in residues if "C" in residue]
+    c_atoms_coords = torch.tensor(np.array([atom.coord for atom in c_atoms]), dtype=torch.float)
+    o_atoms = [residue["O"] for residue in residues if "O" in residue]
+    o_atoms_coords = torch.tensor(np.array([atom.coord for atom in o_atoms]), dtype=torch.float)
 
     # Create k-nearest neighbors graph
     transform = RadiusGraph(r=MAX_DISTANCE, max_num_neighbors=MAX_NUM_NEIGHBORS, loop=True)
-    data = Data(pos=coords)
+    data = Data(pos=ca_atoms_coords)
     data = transform(data)
 
     # Compute edge features (RBF-encoded distances)
-    distances = torch.norm(
-        coords[data.edge_index[0]] - coords[data.edge_index[1]], dim=1
-    )
-    edge_attr = rbf_encode(distances)
+    all_dist = [
+        # ca only 
+        # 16 features == NUM_RBF 
+        #rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
 
-    # for n, c, ca, o distacnes, do the distnaces line again 
-    # n_distances = torch.norm(
-    #     n_coords[data.edge_index[0]] - n_coords[data.edge_index[1]], dim=1
-    # )
+        # backbone only 
+        #4 lists of distacnes encoded to 4*16=64
+        #rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
+        #rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+        #rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
+        #rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
 
-    # then concatenate them all 
-    # all_distances = torch.cat((n_atoms, ca_atoms, c_atoms, o_atoms))
-    # edge_attr = rbf_encode(all_distances)
+        # all backbone atoms by all backbone atoms (4*4=16 lists of distances encoded to 16*16=256 features)
+        rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+        rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(n_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
+
+        rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+        rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(ca_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
+
+        rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+        rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(c_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
+
+        rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - n_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - ca_atoms_coords[data.edge_index[1]], dim=1)),
+        rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - c_atoms_coords[data.edge_index[1]], dim=1)), 
+        rbf_encode(torch.norm(o_atoms_coords[data.edge_index[0]] - o_atoms_coords[data.edge_index[1]], dim=1)), 
+    ]
+
+    edge_attr = torch.cat(all_dist, dim=1)
+    #print(f'{edge_attr.shape=}')
 
     # Node features (backbone dihedrals)
     x = get_backbone_dihedrals(list(residue for residue in residues if "CA" in residue))
 
     # Target (amino acid tokens)
     amino_acids = [residue.resname for residue in residues if "CA" in residue]
-    not_amino_acids = [residue.resname for residue in residues if not "CA" in residue]
+    #not_amino_acids = [residue.resname for residue in residues if not "CA" in residue]
     #print(not_amino_acids)
     
     #print(pdb_file, amino_acids)
@@ -350,37 +392,32 @@ if __name__ == "__main__":
     }
 
     torch.save(splits, "splits.pt")
-
     print(f'number of examples in train={len(train_files)} val={len(val_files)} test={len(test_files)}')
 
     #Load training examples 
-    train_set = []
-    for pdb_file in track(train_files, description=f"Loading training samples (n={len(train_files)})"):
-       try:
-           train_set.append(load_protein_ligand_graph(pdb_file))
-       except KeyError:
-           pass 
+    def load_pdbs(pdb_files, verbose=False):
+        errors = 0 
+        dataset = []
+        for pdb_file in track(pdb_files, description=f"Loading samples (n={len(pdb_files)})"):
+            try:
+                dataset.append(load_protein_ligand_graph(pdb_file))
+            except Exception as e:
+                if verbose:
+                    print(e)
+                errors += 1
+
+        print(f"Processed {len(pdb_files)} files with {errors} errors")
+        return dataset 
+
+    train_set = load_pdbs(train_files)
+    torch.save(train_set, "train_set.pt") 
     # Later, load with:
     # train_set = torch.load("train_set.pt")
     # train_loader = DataLoader(train_set, batch_size=256, shuffle=False)    
-    torch.save(train_set, "train_set.pt") 
 
-    # Process validation examples 
-    val_set = []
-    for pdb_file in track(val_files, description=f"Loading validation samples (n={len(val_files)})"):
-        try:
-            val_set.append(load_protein_ligand_graph(pdb_file))
-        except KeyError:
-            pass 
+    val_set = load_pdbs(val_files)
     torch.save(val_set, "val_set.pt") 
 
-
-    # Process test samples 
-    test_set = []
-    for pdb_file in track(test_files, description=f"Loading validation samples (n={len(test_files)})"):
-        try:
-            test_set.append(load_protein_ligand_graph(pdb_file))
-        except KeyError:
-            pass 
+    test_set = load_pdbs(test_files)
     torch.save(test_set, "test_set.pt") 
 

@@ -15,15 +15,18 @@ seed(42)
 
 # Constants
 NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 16
 NUM_RBF = 16
 MAX_DISTANCE = 32.0
-NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
-NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
+NUM_DIHEDRAL_FEATURES = 4
+NUM_ATOM_FEATURES = 10
 MAX_LENGTH = 512 
-HIDDEN_DIM = 128 
-NUM_LAYERS = 3
+HIDDEN_DIM = 64 
+NUM_LAYERS = 6
 BATCH_SIZE = 32 
+LEARNING_RATE = 3e-4
+EPOCHS = 10 
+EXPR_NAME = "test"
+
 
 ###############################################################################
 # Main training loop                                                          #
@@ -33,37 +36,49 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    
-    # 1. switch to CUDA 
+    # set up cuda 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # 2. tensor32 mm
     torch.set_float32_matmul_precision('high')
 
+    # set up model 
     model = ProteinLigandGNN(
         protein_features=NUM_DIHEDRAL_FEATURES,
         ligand_features=NUM_ATOM_FEATURES,
-        edge_features=NUM_RBF,
+        edge_features=NUM_RBF * 16,  # multiplier is 16 for feat3, 4 for feat2, 1 for feat1 
         hidden_dim=HIDDEN_DIM,
-        num_layers=3,
+        num_layers=NUM_LAYERS,
     ).to(device)
 
-    # 3. compile model 
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
+    print(f"GAT model with {n_params:,} params")
+
+    # set up output files 
     #model = torch.compile(model)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"runs/experiment_{current_time}"
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.95), eps=1e-8)
+    if EXPR_NAME:
+        log_dir = f"runs/experiment_{EXPR_NAME}"
+    else:
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = f"runs/experiment_{current_time}"
     writer = SummaryWriter(log_dir=log_dir)
 
+    # load data 
     train_set = torch.load("train_set.pt") 
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)
+    val_set = torch.load("val_set.pt") 
+    val_loader = DataLoader(val_set, batch_size=32, shuffle=False)
 
     # Run training 
-    num_epochs = 50
+    num_epochs = EPOCHS
     for epoch in range(num_epochs):
-        loss = train(model, train_loader, optimizer, device)
-        writer.add_scalar("epoch/loss/train", loss, epoch)
-        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
+        train_loss = train(model, train_loader, optimizer, device)
+        writer.add_scalar("epoch/loss/train", train_loss, epoch)
+        val_loss = evaluate(model, val_loader, device)
+        writer.add_scalar("epoch/loss/val", val_loss, epoch)    
+        print(f"Epoch {epoch+1}/{num_epochs}, Train loss: {train_loss:.4f} Val loss: {val_loss:.4f}")
+
+    # Save the model params 
+    torch.save(model.state_dict(), "model_state_dict.pt")
 
     # Generate sequence for a single test protein 
     #test_pdb = test_files[0]
@@ -74,11 +89,3 @@ if __name__ == "__main__":
     )
     print("Generated sequence:", generated_sequence)
 
-    # Evaluate on validaton set 
-    val_set = torch.load("val_set.pt") 
-    val_loader = DataLoader(val_set, batch_size=32, shuffle=False)
-    loss = evaluate(model, val_loader, device)
-    print(f"Val loss: {loss:4.4f}")
-
-    # Save the model 
-    torch.save(model.state_dict(), "model_state_dict.pt")
