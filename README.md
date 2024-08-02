@@ -1,6 +1,6 @@
-# Protein design with graph attention networks (GATs)
+## Summary
 
-**Summary.** We pose the problem of protein sequence design given a backbone structure as a node labeling problem and solve it with graph attention networks (GATs). We use a dataset of structurally non-redundant protein structures and implement graph representation and graph attention networks using PyTorch Geometric. In our experiments, GATs achieve perplexities < 5.0, similar to the reported perplexity for protein design algorithms in common use (such as ProteinMPNN), on held-out test data that is structurally dissimilar from training data. 
+We pose the problem of protein sequence design given a backbone structure as a node labeling problem and solve it with graph attention networks (GATs). We use a dataset of structurally non-redundant protein structures and implement graph representation and graph attention networks using PyTorch Geometric. In our experiments, GATs achieve perplexities < 5.0, similar to the reported perplexity for protein design algorithms in common use (such as ProteinMPNN), on held-out test data that is structurally dissimilar from training data. 
 
 ## Designing sequences from structures with deep learning 
 
@@ -8,7 +8,9 @@ One important application of the use of deep learning to protein design is the d
 
 Empirically, structure-conditioned protein sequence design algorithms have been useful for designing stabilizing mutations [^2], structure-guided diversification in design pipelines [^3], and have recently been updated to include structural information from nucleic acids, small molecule ligands, and metal ions [^4]. They are routinely used to design sequences as part of de novo protein design pipelines [^5]. Many different implementations are available, with different properties, most largely based on the original implementation by John Ingraham [^6]. 
 
-For this project, I'd like to do something a little different. Graph attention networks, introduced by Veličković in 2017 [^7] and updated in 2021 by Brody [^8], make use of an attention mechanism on the graph structure and are similar to the model developed by Ingraham. Here, we reimagine the problem of protein design as a node labeling problem on a graph that we build from the protein structure. Using PyG, we build a flexible and scalable graph attention network that learns from backbone coordinates by representing each designable residue or ligand as a node, with edge features derived from backbone atom distances.  
+### Graph attention networks as a learning framework 
+
+For this project, I'd like to do something a little different. Graph attention networks, introduced by Veličković in 2017 [^7] and updated in 2021 by Brody [^8], make use of an attention mechanism on the graph structure and are similar to the model developed by Ingraham, except simpler in that they do not have the autoregressive decoder. Here, we reimagine the problem of protein design as a node labeling problem on a graph that we build from the protein structure. Using PyG, we build a flexible and scalable graph attention network that learns from backbone coordinates by representing each designable residue or ligand as a node, with edge features derived from backbone atom distances. All of this is implemented in a straightforward and clean way in modern PyTorch. 
 
 [^1]: https://github.com/RosettaCommons/rosetta
 [^2]: https://github.com/dauparas/ProteinMPNN/
@@ -55,31 +57,13 @@ We provide the following introduction to graph attention networks (GATs) followi
 
 For the model architecture, we chose a graph attention network (GATv2) model as implemented in PyG[^9]. In the GAT model, we input graph-structured data where each node is a residue for which we require a categorical label in the amino acid alphabet. Each training step, the network generates an updated representation $h'_i$ from the representations of its neighbors. The neighbors of a node $N = \{j \in V\,|\,(j, i) \in E\}$ are calculated by the PyG `RadiusGraph`, with a maximum distance of 32.0 angstrom and a configurable maximum number (either 16 or 32 in this study). The updated node features $h'_i$ are calculated based on an attention mechanism:
 
-$$
-h'_i = \sum{} \alpha_{i,j} \Theta_t h_j
-$$
+$$h'_i = \sum{} \alpha_{i,j} W h_j$$
 
-where $\alpha$ is the attention score for nodes $i$ and $j$ and $\Theta$ is a linear transformation from the edge dimension into the model dimension. The calculation for $\alpha$ is provided by the PyG documentation[^9]:
+where $\alpha$ is the attention score for nodes $i$ and $j$ and $W$ is a linear transformation from the edge dimension into the model dimension. The calculation for the attention scores $\alpha$ are calculated as 
 
-$$
- \alpha_{i,j} =
-        \frac{
-        \exp\left(\mathbf{a}^{\top}\mathrm{LeakyReLU}\left(
-        \mathbf{\Theta}_{s} \mathbf{x}_i
-        + \mathbf{\Theta}_{t} \mathbf{x}_j
-        + \mathbf{\Theta}_{e} \mathbf{e}_{i,j}
-        \right)\right)}
-        {\sum_{k \in \mathcal{N}(i) \cup \{ i \}}
-        \exp\left(\mathbf{a}^{\top}\mathrm{LeakyReLU}\left(
-        \mathbf{\Theta}_{s} \mathbf{x}_i
-        + \mathbf{\Theta}_{t} \mathbf{x}_k
-        + \mathbf{\Theta}_{e} \mathbf{e}_{i,k}]
-        \right)\right)}
-$$
+$$\alpha_{i,j} = \textrm{softmax}(a^T [ W h_i \| W h_j \| W_2 e_{i, j} ])$$
 
-Where each of the $\Theta_s$, $\Theta_t$, $\Theta_e$ corresponds to the relevant `Linear` layer in the PyG implementation.  
-
-- See `model.py` for the model implementation 
+where the operation $||$ denotes vector concatenation. In this implementation, we use both the node embeddings $h_i$ and the edge embeddings $e_{i,j}$ to compute the attention weights [^9].  See `model.py` for the model implementation. 
 
 [^9]: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.GATv2Conv.html 
 
@@ -192,99 +176,3 @@ We have sampled some of the hyper parameter space in our experiments, and sugges
 1. Tune hyper parameters: I'd like to experiment with learning rate, and try the `TransformerConv` layer. Also, we should explore expanding the number of heads, instead of the number of layers. 
 2. Evaluate the models' ability to design new sequences using the provided `generate_sequence` function, we leave for a Part 2. 
 3. Evaluate some designed sequences in the lab
-
-
-## [Private] Training log  
-
-- updated the code to be more modular, and preprocess the data seperately 
-- let's focus on doing a grid of two params, I'd say, hidden size and number of layers, and number of heads? 
-
-
-Thu 7 pm, create lambda labs instance and write down install Python steps. 
-
-Preprocessed whole dataset with data.py, takes about 20 mintes 
-
-Train a series of three models with different hidden dims, 64, 128, and 256 to start out with. Capture the models. Capture the training curves. (Show that you can do "test" offline?) Those are the goals 
-
-- capture the 3 models 
-- capture the 3 training curves 
-
-For these runs, 
-number of examples in train=25508 val=3188 test=3189
-
-```
-# Constants
-NUM_AMINO_ACIDS = 20
-MAX_NUM_NEIGHBORS = 16
-NUM_RBF = 16
-MAX_DISTANCE = 32.0
-NUM_DIHEDRAL_FEATURES = 4  # phi, psi, omega, and chi1
-NUM_ATOM_FEATURES = 10  # Atom type, hybridization, aromaticity, etc.
-MAX_LENGTH = 512 
-HIDDEN_DIM = 64 
-NUM_LAYERS = 3
-BATCH_SIZE = 256
-LEARNING_RATE = 3e-4
-EXPR_NAME = "h64"
-```
-
-Here we go 
-
-h64, train loss 1.8986, val loss 1.9114,  
-h128, train loss 1.86, vall loss 1.87,   
-h256, train loss Loss: 1.82, 1.84, batch size 128 
-h64_b128, train loss 1.88, val loss 1.89
-h128_b128, train loss 1.84, vall los 1.85
-
-catotured model and training curve to local gato/expr/experiment_2 folder since that's the experiment I'm doing here 
-
-
-Started h128 at 8pm, looks like less than 1 minute per epoch, so done betfore 9 pm, let's eat!  
-
-YOu know it, woul dbe smart ro start with the largest model possible, and then work downwards from there ... instead of this, I'm going to run out of memory if I try a hidden of 256, unless I also hange the batch size, which changes the number of updates the model makes and makes each update noisier, not great really 
-
-h128 done before 8:45 
-
-h256 with batch size 256 OoM, so I tried h256 BATCH_SIZE = 128 
-
-
-
-
-now we'll try a train run with h=128 b=128 
-
-We compare to yesterday's `h128_b128, train loss 1.84, vall los 1.85` after 50 epochs 
-
-Today's model is slightly larger, and we have slightly fewer datapoints (by <1%) 
-
-FInal train loss, 1.78, val loss 1.79 that is the lowest we have seen! 
-
-Compare to ProteinMPNN, perplexity 5.0, our loss1.78, perplexity 5.9, so where is the extra compin from? Well proteinMPNN technically has 6 layers, since it's encoder and decoder, and also the language model part, and also uses backwards and forwards features. Let's try 6 layers first 
-
-also, I called ca only features feat1, 4backbone atoms feat2, and 4x4=16 feat3 
-
-Started a run h128_b128_feat3_l6 with 6 layers, and epoch 15 already at train loss 1.80!! (perplexity 6.04) which is compareable to the lowest we have ever seen, but we are only at epoch 15, so we have a lot more to go! 
-
-Epoch 139/150, Loss: 1.6551 at 12:37 am Jul 27!!! We have someting here bubba, thst is prelexptiy 5.2, which is basically right in ProteinMPNN best range. 
-
-And we still have work to do! Next we can try 
-
-1. compile the damn model! 
-2. increase the number of neighbors from 16 to 32 ... bet this will be huge!!!! 
-3. and also try transformerconv 
-4. and think about ... what is the size of our node features, is it 4? is all the info being crammed into 4 numbers per residue? 
-
-OK now July 27 saturday, we are going to increase the number of neihbors and compiel that model! 
-
-So now we have to regenerate data, since more nighbors, and compile the model. Dtata atsrated at 6:20 pm 
-
-- check the size of data (120 GB?) 
-
-Data not finished at 6:53 pm, finished 7 pm. 
-
-7 pm started training run, it'll copy data into mem first ... then run with compiled model. The prevbous big model, h128_b128_feat3_l6_e150, took 4 hours, so ,,,
-
-OMGGGGG it's 10 pm, the model is training super well as `experiment_h128_b128_feat3_k32_l6_e150_compiled` and it's at epoch 100 and already down to train loss of 1.62
-
-Finished at 11:19 pm wtih train  Loss: 1.5896 and Val loss: 1.6466
-
-1.64 is perpelxity 5.15
