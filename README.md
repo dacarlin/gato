@@ -1,3 +1,5 @@
+# Protein design using graph attention networks (GATs)
+
 ## Summary
 
 We pose the problem of protein sequence design given a backbone structure as a node labeling problem and solve it with graph attention networks (GATs). We use a dataset of structurally non-redundant protein structures and implement graph representation and graph attention networks using PyTorch Geometric. In our experiments, GATs achieve perplexities < 5.0, similar to the reported perplexity for protein design algorithms in common use (such as ProteinMPNN), on held-out test data that is structurally dissimilar from training data. 
