@@ -59,17 +59,11 @@ We provide the following introduction to graph attention networks (GATs) followi
 
 For the model architecture, we chose a graph attention network (GATv2) model as implemented in PyG[^9]. In the GAT model, we input graph-structured data where each node is a residue for which we require a categorical label in the amino acid alphabet. Each training step, the network generates an updated representation $h'_i$ from the representations of its neighbors. The neighbors of a node $N = \{j \in V\,|\,(j, i) \in E\}$ are calculated by the PyG `RadiusGraph`, with a maximum distance of 32.0 angstrom and a configurable maximum number (either 16 or 32 in this study). The updated node features $h'_i$ are calculated based on an attention mechanism:
 
-$$
-h'_i = \sum{} \alpha_{i,j} W h_j
-$$
+$$ h'_i = \sum{} \alpha_{i,j} W h_j $$
 
 where $\alpha$ is the attention score for nodes $i$ and $j$ and $W$ is a linear transformation from the edge dimension into the model dimension. The calculation for the attention scores $\alpha$ are calculated as 
 
-$$
-
-\alpha_{i,j} = \textrm{softmax}(a^T [ W h_i \| W h_j \| W_2 e_{i, j} ])
-
-$$
+$$ \alpha_{i,j} = \textrm{softmax}(a^T [ W h_i \| W h_j \| W_2 e_{i, j} ]) $$
 
 where the operation $||$ denotes vector concatenation. In this implementation, we use both the node embeddings $h_i$ and the edge embeddings $e_{i,j}$ to compute the attention weights [^9].  See `model.py` for the model implementation. 
 
